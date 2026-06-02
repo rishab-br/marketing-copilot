@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# ---- Claude Code (per-machine local settings) ----
+.claude/settings.local.json
+
 # ---- Python ----
 __pycache__/
 *.py[cod]
