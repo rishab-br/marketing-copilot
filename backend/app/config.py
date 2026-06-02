@@ -1,0 +1,50 @@
+"""Environment-driven application settings.
+
+All configuration flows through here. Business logic must never read os.environ
+directly or hardcode model strings — import ``settings`` instead.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Repo root is two levels above this file: backend/app/config.py -> repo root.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+class Settings(BaseSettings):
+    """Typed, env-driven settings. Loaded once and cached."""
+
+    model_config = SettingsConfigDict(
+        env_file=_REPO_ROOT / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # ---- LLM provider (kept swappable; see app/llm/client.py) ----
+    llm_provider: str = "gemini"
+    llm_model: str = "gemini-2.0-flash"
+    gemini_api_key: str = ""
+    llm_temperature: float = 0.7
+
+    # ---- Orchestration knobs ----
+    eval_threshold: float = 4.0
+    max_iterations: int = 3
+
+    # ---- Persistence ----
+    database_url: str = "sqlite:///./marketing_copilot.db"
+
+    # ---- App ----
+    log_level: str = "INFO"
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Return the cached settings singleton."""
+    return Settings()
+
+
+settings = get_settings()
