@@ -1,20 +1,32 @@
-"""FastAPI application entrypoint.
-
-v1 exposes ``GET /health`` as the first route; agent + campaign routes are added
-in later build steps.
-"""
+"""FastAPI application entrypoint."""
 
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from app.config import settings
+from app.db import init_db
+from app.routers import campaigns
 
 logging.basicConfig(level=settings.log_level.upper())
 
-app = FastAPI(title="Agentic Digital Marketing Copilot", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+
+
+app = FastAPI(
+    title="Agentic Digital Marketing Copilot",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+app.include_router(campaigns.router)
 
 
 @app.get("/health")
