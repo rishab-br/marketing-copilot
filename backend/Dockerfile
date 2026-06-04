@@ -13,8 +13,11 @@ COPY pyproject.toml ./
 COPY app ./app
 RUN pip install --upgrade pip && pip install .
 
-# Run as a non-root user.
-RUN useradd --create-home --uid 1000 appuser && chown -R appuser /app
+# Run as a non-root user. Pre-create the data dir owned by appuser so an empty
+# named volume mounted at /app/data inherits writable ownership.
+RUN useradd --create-home --uid 1000 appuser \
+    && mkdir -p /app/data \
+    && chown -R appuser /app
 USER appuser
 
 EXPOSE 8000
