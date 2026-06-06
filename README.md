@@ -58,7 +58,7 @@ POST .../assets/{platform}/regenerate ► re-run the loop for one platform
 - **LLM:** provider-agnostic behind a thin client; default **Google Gemini**
   (`google-genai`), model env-driven — swap providers without touching logic
 - **Persistence:** SQLite via SQLModel (async, `aiosqlite`)
-- **Frontend:** Flutter (Riverpod + dio + SSE) — *in progress*
+- **Frontend:** React + Vite + TailwindCSS — brief form → live SSE progress → review/approve
 - **Packaging:** Docker + docker-compose; CI via GitHub Actions (ruff + black + pytest)
 
 ---
@@ -83,6 +83,11 @@ backend/
     store.py, db.py    SQLModel tables + async session
   tests/               61 tests, no LLM calls (fakes + temp DB)
   Dockerfile, fly.toml
+app/                   React + Vite + Tailwind frontend
+  src/
+    api.js             fetch + SSE client
+    App.jsx            brief → run → review state machine
+    components/        BriefForm, RunProgress, ReviewCards, ui
 docker-compose.yml
 .github/workflows/ci.yml
 ```
@@ -106,10 +111,16 @@ docker compose up --build
 
 ### 3. Or run natively
 ```bash
+# backend
 cd backend
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload                        # http://localhost:8000
+
+# frontend (separate terminal)
+cd app
+npm install
+npm run dev                                          # http://localhost:5173 (proxies /api → :8000)
 ```
 
 ---
