@@ -57,6 +57,36 @@ class _Provider(Protocol):
 # --------------------------------------------------------------------------- #
 # Concrete providers (the ONLY place provider SDKs may be imported)
 # --------------------------------------------------------------------------- #
+class GroqProvider:
+    """Groq provider via the ``groq`` SDK (OpenAI-style chat + JSON mode)."""
+
+    def __init__(self, api_key: str, model: str) -> None:
+        from groq import AsyncGroq  # imported lazily so other providers don't require it
+
+        self._client = AsyncGroq(api_key=api_key)
+        self.model = model
+
+    async def complete(self, *, system: str, prompt: str, temperature: float) -> _Completion:
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        response = await self._client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=temperature,
+            response_format={"type": "json_object"},
+        )
+        usage = getattr(response, "usage", None)
+        return _Completion(
+            text=response.choices[0].message.content or "",
+            prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+            completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+            total_tokens=getattr(usage, "total_tokens", 0) or 0,
+        )
+
+
 class GeminiProvider:
     """Google Gemini provider via the ``google-genai`` SDK."""
 
@@ -91,11 +121,17 @@ class GeminiProvider:
 def _build_provider() -> _Provider:
     """Construct the configured provider. Add new providers here behind the env switch."""
     provider = settings.llm_provider.lower()
+    if provider == "groq":
+        if not settings.groq_api_key:
+            raise LLMError("GROQ_API_KEY is not set; cannot construct the Groq provider.")
+        return GroqProvider(api_key=settings.groq_api_key, model=settings.llm_model)
     if provider == "gemini":
         if not settings.gemini_api_key:
             raise LLMError("GEMINI_API_KEY is not set; cannot construct the Gemini provider.")
         return GeminiProvider(api_key=settings.gemini_api_key, model=settings.llm_model)
-    raise LLMError(f"Unsupported LLM_PROVIDER {settings.llm_provider!r}. v1 supports: 'gemini'.")
+    raise LLMError(
+        f"Unsupported LLM_PROVIDER {settings.llm_provider!r}. v1 supports: 'groq', 'gemini'."
+    )
 
 
 # --------------------------------------------------------------------------- #

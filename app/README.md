@@ -21,8 +21,8 @@ backend alongside it:
 cd ../backend && uvicorn app.main:app --reload
 ```
 
-Set `GEMINI_API_KEY` in the repo-root `.env` for real generation (without it, a run
-surfaces a clear "GEMINI_API_KEY is not set" error in the UI — the wiring still works).
+Set `GROQ_API_KEY` in the repo-root `.env` for real generation (without it, a run
+surfaces a clear "GROQ_API_KEY is not set" error in the UI — the wiring still works).
 
 ## Build
 

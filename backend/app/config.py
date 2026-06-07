@@ -25,8 +25,9 @@ class Settings(BaseSettings):
     )
 
     # ---- LLM provider (kept swappable; see app/llm/client.py) ----
-    llm_provider: str = "gemini"
-    llm_model: str = "gemini-2.0-flash"
+    llm_provider: str = "groq"
+    llm_model: str = "llama-3.3-70b-versatile"
+    groq_api_key: str = ""
     gemini_api_key: str = ""
     llm_temperature: float = 0.7
 

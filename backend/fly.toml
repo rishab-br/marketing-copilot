@@ -4,7 +4,7 @@
 #   cd backend
 #   fly launch --no-deploy        # pick a unique app name; it rewrites `app` below
 #   fly volume create copilot_data --size 1
-#   fly secrets set GEMINI_API_KEY=your-key
+#   fly secrets set GROQ_API_KEY=your-key
 #   fly deploy
 #
 # The volume gives SQLite a persistent home; the container entrypoint chowns it
@@ -18,8 +18,8 @@ primary_region = "iad"
 
 [env]
   DATABASE_URL = "sqlite:///./data/marketing_copilot.db"
-  LLM_PROVIDER = "gemini"
-  LLM_MODEL = "gemini-2.0-flash"
+  LLM_PROVIDER = "groq"
+  LLM_MODEL = "llama-3.3-70b-versatile"
 
 [[mounts]]
   source = "copilot_data"

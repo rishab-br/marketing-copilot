@@ -55,8 +55,9 @@ POST .../assets/{platform}/regenerate ► re-run the loop for one platform
 - **Backend:** Python 3.12, FastAPI (async), SSE via `sse-starlette`
 - **Orchestration:** LangGraph
 - **Validation:** Pydantic v2 (every agent boundary is a typed model)
-- **LLM:** provider-agnostic behind a thin client; default **Google Gemini**
-  (`google-genai`), model env-driven — swap providers without touching logic
+- **LLM:** provider-agnostic behind a thin client; default **Groq** (Llama 3.3 70B),
+  with **Google Gemini** also supported — model + provider env-driven, swap without
+  touching agent/graph logic
 - **Persistence:** SQLite via SQLModel (async, `aiosqlite`)
 - **Frontend:** React + Vite + TailwindCSS — brief form → live SSE progress → review/approve
 - **Packaging:** Docker + docker-compose; CI via GitHub Actions (ruff + black + pytest)
@@ -99,7 +100,7 @@ docker-compose.yml
 ### 1. Configure
 ```bash
 cp .env.example .env
-# set GEMINI_API_KEY (from Google AI Studio) for real generation
+# set GROQ_API_KEY (from console.groq.com) for real generation
 ```
 
 ### 2. Run with Docker (recommended)
@@ -158,7 +159,7 @@ real critic and reports accuracy + a confusion matrix:
 
 ```bash
 cd backend
-python -m app.eval.runner    # needs GEMINI_API_KEY
+python -m app.eval.runner    # needs GROQ_API_KEY
 ```
 
 The dataset is deliberately mixed: banned-claim cases are caught by the
@@ -192,7 +193,7 @@ SQLite needs a persistent disk, which Fly volumes provide.
 cd backend
 fly launch --no-deploy                 # pick a unique app name
 fly volume create copilot_data --size 1
-fly secrets set GEMINI_API_KEY=your-key
+fly secrets set GROQ_API_KEY=your-key
 fly deploy
 ```
 
