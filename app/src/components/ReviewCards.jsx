@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getPosts, publishAsset } from '../api'
+import PublishModal from './PublishModal'
 import { Badge, Button, PlatformIcon, ScoreBar, ScoreRing, Spinner } from './ui'
 
 const THRESHOLD = 4.0
@@ -166,7 +168,35 @@ function PostMockup({ platform, asset }) {
   )
 }
 
-function AssetCard({ item, busy, onApprove, onRegenerate }) {
+function PostStatusBadge({ post }) {
+  if (!post) return null
+  if (post.status === 'published') {
+    return (
+      <Badge tone="cyan">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
+        </svg>
+        Published
+      </Badge>
+    )
+  }
+  if (post.status === 'pending') {
+    return (
+      <Badge tone="amber">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Scheduled
+      </Badge>
+    )
+  }
+  if (post.status === 'failed') {
+    return <Badge tone="red">Failed</Badge>
+  }
+  return null
+}
+
+function AssetCard({ item, post, busy, onApprove, onRegenerate, onPublish }) {
   const { asset, guardrail, score, iterations, approved } = item
   const platform = asset.platform
   const platformLabel = PLATFORM_LABELS[platform] ?? platform
@@ -187,6 +217,7 @@ function AssetCard({ item, busy, onApprove, onRegenerate }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <PostStatusBadge post={post} />
           {approved && (
             <Badge tone="green">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -248,6 +279,27 @@ function AssetCard({ item, busy, onApprove, onRegenerate }) {
           <p className="text-xs leading-relaxed text-ink-2 italic">"{score.rationale}"</p>
         </div>
 
+        {/* Published post link */}
+        {post?.status === 'published' && post.url && (
+          <a
+            href={post.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg border border-cyan-500/25 bg-cyan-500/8 px-3 py-2 text-xs text-cyan-400 hover:bg-cyan-500/15 transition"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/>
+            </svg>
+            View live post
+          </a>
+        )}
+        {post?.status === 'pending' && post.scheduled_at && (
+          <p className="text-xs text-amber-400">
+            Scheduled for {new Date(post.scheduled_at).toLocaleString()}
+          </p>
+        )}
+
         {/* Actions */}
         <div className="flex items-center gap-2 pt-1">
           <Button
@@ -294,6 +346,24 @@ function AssetCard({ item, busy, onApprove, onRegenerate }) {
               </>
             )}
           </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => onPublish(platform)}
+            disabled={!approved || !!busy}
+            title={!approved ? 'Approve first to unlock publishing' : undefined}
+          >
+            {busy === 'publish' ? (
+              <><Spinner size={13} /> Publishing…</>
+            ) : (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
+                </svg>
+                Publish
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </div>
@@ -302,6 +372,20 @@ function AssetCard({ item, busy, onApprove, onRegenerate }) {
 
 export default function ReviewCards({ campaign, onApprove, onRegenerate, onStartOver }) {
   const [busy, setBusy] = useState({})
+  const [posts, setPosts] = useState({}) // keyed by platform, latest post per platform
+  const [publishModal, setPublishModal] = useState(null) // platform string or null
+
+  // Load existing posts for this campaign on mount.
+  useEffect(() => {
+    if (!campaign?.id) return
+    getPosts(campaign.id)
+      .then((list) => {
+        const byPlatform = {}
+        for (const p of list) byPlatform[p.platform] = p // last-write wins
+        setPosts(byPlatform)
+      })
+      .catch(() => {}) // non-fatal
+  }, [campaign?.id])
 
   const wrap = (action, fn) => async (platform) => {
     setBusy((b) => ({ ...b, [platform]: action }))
@@ -312,74 +396,99 @@ export default function ReviewCards({ campaign, onApprove, onRegenerate, onStart
     }
   }
 
+  const handlePublish = (platform) => (opts) =>
+    publishAsset(campaign.id, platform, opts).then((result) => {
+      setPosts((p) => ({ ...p, [platform]: result }))
+      return result
+    })
+
   const assets = campaign?.assets ?? []
   const approvedCount = assets.filter((a) => a.approved).length
   const passedCount = assets.filter(
     (a) => a.guardrail?.passed && a.score?.overall >= THRESHOLD,
   ).length
+  const publishedCount = Object.values(posts).filter((p) => p.status === 'published').length
 
   return (
-    <div className="animate-fade-in space-y-6">
-      {/* Summary bar */}
-      <div className="flex items-center justify-between rounded-xl border border-border bg-surface-1 px-5 py-4">
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <p className="text-lg font-bold text-ink-1">{assets.length}</p>
-            <p className="text-[10px] text-ink-3 uppercase tracking-wide">assets</p>
-          </div>
-          <div className="h-8 w-px bg-border" />
-          <div className="text-center">
-            <p className="text-lg font-bold text-emerald-400">{passedCount}</p>
-            <p className="text-[10px] text-ink-3 uppercase tracking-wide">passed gate</p>
-          </div>
-          <div className="h-8 w-px bg-border" />
-          <div className="text-center">
-            <p className="text-lg font-bold text-violet-400">{approvedCount}</p>
-            <p className="text-[10px] text-ink-3 uppercase tracking-wide">approved</p>
-          </div>
-          {campaign?.needs_human_attention && (
-            <>
-              <div className="h-8 w-px bg-border" />
-              <Badge tone="amber">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-                  <path d="M12 9v4"/><path d="M12 17h.01"/>
-                </svg>
-                Needs attention
-              </Badge>
-            </>
-          )}
-        </div>
-
-        <button
-          onClick={onStartOver}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-ink-3 transition hover:bg-surface-2 hover:text-ink-1"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>
-          </svg>
-          New campaign
-        </button>
-      </div>
-
-      {/* Asset cards */}
-      <div className="space-y-5">
-        {assets.map((item) => (
-          <AssetCard
-            key={item.platform}
-            item={item}
-            busy={busy[item.platform]}
-            onApprove={wrap('approve', onApprove)}
-            onRegenerate={wrap('regenerate', onRegenerate)}
-          />
-        ))}
-      </div>
-
-      {assets.length === 0 && (
-        <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center text-sm text-ink-3">
-          No assets were produced.
-        </div>
+    <>
+      {/* Publish modal (portal-style, rendered above everything) */}
+      {publishModal && (
+        <PublishModal
+          platform={publishModal}
+          onClose={() => setPublishModal(null)}
+          onPublish={handlePublish(publishModal)}
+        />
       )}
-    </div>
+
+      <div className="animate-fade-in space-y-6">
+        {/* Summary bar */}
+        <div className="flex items-center justify-between rounded-xl border border-border bg-surface-1 px-5 py-4">
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <p className="text-lg font-bold text-ink-1">{assets.length}</p>
+              <p className="text-[10px] text-ink-3 uppercase tracking-wide">assets</p>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-emerald-400">{passedCount}</p>
+              <p className="text-[10px] text-ink-3 uppercase tracking-wide">passed gate</p>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-violet-400">{approvedCount}</p>
+              <p className="text-[10px] text-ink-3 uppercase tracking-wide">approved</p>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-cyan-400">{publishedCount}</p>
+              <p className="text-[10px] text-ink-3 uppercase tracking-wide">published</p>
+            </div>
+            {campaign?.needs_human_attention && (
+              <>
+                <div className="h-8 w-px bg-border" />
+                <Badge tone="amber">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                    <path d="M12 9v4"/><path d="M12 17h.01"/>
+                  </svg>
+                  Needs attention
+                </Badge>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={onStartOver}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-ink-3 transition hover:bg-surface-2 hover:text-ink-1"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>
+            </svg>
+            New campaign
+          </button>
+        </div>
+
+        {/* Asset cards */}
+        <div className="space-y-5">
+          {assets.map((item) => (
+            <AssetCard
+              key={item.platform}
+              item={item}
+              post={posts[item.asset.platform]}
+              busy={busy[item.platform]}
+              onApprove={wrap('approve', onApprove)}
+              onRegenerate={wrap('regenerate', onRegenerate)}
+              onPublish={(platform) => setPublishModal(platform)}
+            />
+          ))}
+        </div>
+
+        {assets.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center text-sm text-ink-3">
+            No assets were produced.
+          </div>
+        )}
+      </div>
+    </>
   )
 }

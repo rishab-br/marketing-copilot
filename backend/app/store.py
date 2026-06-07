@@ -15,7 +15,7 @@ from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models import Asset, AssetResult, Brief, EvalScore, GuardrailResult
+from app.models import Asset, AssetResult, Brief, EvalScore, GuardrailResult, PostStatus, PublishResult
 
 
 def _uuid() -> str:
@@ -49,6 +49,22 @@ class AssetRecord(SQLModel, table=True):
     score: dict = Field(sa_column=Column(JSON))
     iterations: int = Field(default=0)
     approved: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class PostRecord(SQLModel, table=True):
+    """One publish or schedule action for a campaign asset."""
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    campaign_id: str = Field(index=True, foreign_key="campaign.id")
+    platform: str = Field(index=True)
+    post_id: str = Field(default="")              # platform-assigned ID
+    url: str | None = Field(default=None)          # live post URL
+    status: str = Field(default="pending")         # pending|published|failed|cancelled
+    scheduled_at: datetime | None = Field(default=None)
+    published_at: datetime | None = Field(default=None)
+    error: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 
@@ -194,3 +210,72 @@ async def finish_run(
     run.finished_at = _now()
     session.add(run)
     await session.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Post (publish) CRUD
+# --------------------------------------------------------------------------- #
+
+
+def _record_to_result(record: PostRecord) -> PublishResult:
+    return PublishResult(
+        id=record.id,
+        platform=record.platform,
+        post_id=record.post_id,
+        url=record.url,
+        status=PostStatus(record.status),
+        published_at=record.published_at,
+        scheduled_at=record.scheduled_at,
+        error=record.error,
+    )
+
+
+async def create_post(
+    session: AsyncSession,
+    *,
+    campaign_id: str,
+    platform: str,
+    post_id: str,
+    url: str | None,
+    status: PostStatus,
+    scheduled_at: datetime | None = None,
+    published_at: datetime | None = None,
+    error: str | None = None,
+) -> PublishResult:
+    record = PostRecord(
+        campaign_id=campaign_id,
+        platform=platform,
+        post_id=post_id,
+        url=url,
+        status=status.value,
+        scheduled_at=scheduled_at,
+        published_at=published_at,
+        error=error,
+    )
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return _record_to_result(record)
+
+
+async def get_post(session: AsyncSession, post_id: str) -> PublishResult | None:
+    record = await session.get(PostRecord, post_id)
+    return _record_to_result(record) if record else None
+
+
+async def list_posts(session: AsyncSession, campaign_id: str) -> list[PublishResult]:
+    stmt = select(PostRecord).where(PostRecord.campaign_id == campaign_id)
+    records = (await session.exec(stmt)).all()
+    return [_record_to_result(r) for r in records]
+
+
+async def cancel_post(session: AsyncSession, post_id: str) -> PublishResult | None:
+    record = await session.get(PostRecord, post_id)
+    if record is None or record.status != PostStatus.pending.value:
+        return None
+    record.status = PostStatus.cancelled.value
+    record.updated_at = _now()
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return _record_to_result(record)

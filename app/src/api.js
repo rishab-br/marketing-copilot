@@ -39,6 +39,24 @@ export function regenerateAsset(id, platform) {
   }).then(asJson)
 }
 
+export function publishAsset(campaignId, platform, { scheduledAt } = {}) {
+  return fetch(`${BASE}/campaigns/${campaignId}/assets/${platform}/publish`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(scheduledAt ? { scheduled_at: scheduledAt } : {}),
+  }).then(asJson)
+}
+
+export function getPosts(campaignId) {
+  return fetch(`${BASE}/campaigns/${campaignId}/posts`).then(asJson)
+}
+
+export function cancelPost(campaignId, postId) {
+  return fetch(`${BASE}/campaigns/${campaignId}/posts/${postId}`, {
+    method: 'DELETE',
+  }).then(asJson)
+}
+
 // Open an SSE stream of agent progress. Returns the EventSource so callers can
 // close it on unmount. The backend tags each event with its type as the SSE
 // event name ("node" | "complete" | "error").

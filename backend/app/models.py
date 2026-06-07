@@ -8,6 +8,8 @@ prompts, so they double as instructions to the model.
 
 from __future__ import annotations
 
+from datetime import datetime
+from enum import Enum
 from typing import Annotated, ClassVar
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -149,3 +151,37 @@ class AssetResult(BaseModel):
     def passed(self, threshold: float) -> bool:
         """An asset passes only if guardrails pass AND the score meets threshold."""
         return self.guardrail.passed and self.score.meets(threshold)
+
+
+# --------------------------------------------------------------------------- #
+# Publishing models (v2)
+# --------------------------------------------------------------------------- #
+
+
+class PostStatus(str, Enum):
+    pending = "pending"       # scheduled, awaiting execution
+    published = "published"   # live on the platform
+    failed = "failed"         # attempt failed
+    cancelled = "cancelled"   # cancelled before publication
+
+
+class PublishRequest(BaseModel):
+    """Request body for the publish/schedule endpoint."""
+
+    scheduled_at: datetime | None = Field(
+        default=None,
+        description="ISO-8601 datetime to publish at. None means publish immediately.",
+    )
+
+
+class PublishResult(BaseModel):
+    """Result returned after a publish or schedule action."""
+
+    id: str = Field(..., description="Internal PostRecord ID.")
+    platform: str
+    post_id: str = Field(..., description="Platform-assigned post ID (or stub ID).")
+    url: str | None = Field(default=None, description="Live post URL once published.")
+    status: PostStatus
+    published_at: datetime | None = None
+    scheduled_at: datetime | None = None
+    error: str | None = None

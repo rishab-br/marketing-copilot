@@ -41,6 +41,21 @@ class Settings(BaseSettings):
     # ---- App ----
     log_level: str = "INFO"
 
+    # ---- Publishing (v2) ----
+    # "stub" = simulate publishing locally (default, no API keys needed)
+    # "real" = call real platform APIs (falls back to stub if keys absent)
+    publishing_mode: str = "stub"
+
+    # Twitter / X credentials (needed when publishing_mode=real)
+    twitter_consumer_key: str = ""
+    twitter_consumer_secret: str = ""
+    twitter_access_token: str = ""
+    twitter_access_token_secret: str = ""
+
+    # LinkedIn credentials (needed when publishing_mode=real)
+    linkedin_access_token: str = ""
+    linkedin_author_urn: str = ""   # e.g. "urn:li:person:XXXXXXXX"
+
 
 @lru_cache
 def get_settings() -> Settings:

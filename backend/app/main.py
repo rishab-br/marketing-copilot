@@ -9,7 +9,7 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.db import init_db
-from app.routers import campaigns
+from app.routers import campaigns, publishing
 
 logging.basicConfig(level=settings.log_level.upper())
 
@@ -27,6 +27,7 @@ app = FastAPI(
 )
 
 app.include_router(campaigns.router)
+app.include_router(publishing.router)
 
 
 @app.get("/health")

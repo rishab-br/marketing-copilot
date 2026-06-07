@@ -46,6 +46,9 @@ htmlcov/
 *.sqlite
 *.sqlite3
 
+# ---- Graphify (generated knowledge graph) ----
+graphify-out/
+
 # ---- Flutter / Dart ----
 app/.dart_tool/
 app/.flutter-plugins
