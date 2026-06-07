@@ -2,10 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-canvas text-ink-1 antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'liga' 1;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-surface-3;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-4;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-violet-600/30 text-violet-100;
+  }
 }
 
-body {
-  @apply bg-slate-950 text-slate-100 antialiased;
+@layer components {
+  /* Input base */
+  .input-base {
+    @apply w-full rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm text-ink-1
+           placeholder-ink-3 outline-none transition-all duration-150
+           focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20;
+  }
+
+  /* Card */
+  .card {
+    @apply rounded-xl border border-border bg-surface-1 shadow-card;
+  }
+
+  /* Glow on active elements */
+  .glow-violet {
+    box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.4), 0 0 16px rgba(124, 58, 237, 0.15);
+  }
+}
+
+@layer utilities {
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent;
+  }
+
+  /* Shimmer loading */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      #1D1F2A 25%,
+      #242636 50%,
+      #1D1F2A 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
 }
